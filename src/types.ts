@@ -25,6 +25,7 @@ export interface CameraInfo {
   browser: string;
   imageCapturAvailable: boolean;
   zoomCapability: ZoomCapabilities | null;
+  panTiltCapability: PanTiltCapabilities | null;
   jpegQuality: number;
   isMockCamera?: boolean;
   requestedConstraints: MediaTrackConstraints;

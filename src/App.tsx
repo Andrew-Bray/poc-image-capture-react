@@ -281,6 +281,7 @@ export default function App() {
           browser: navigator.userAgent,
           imageCapturAvailable: typeof ImageCapture !== 'undefined',
           zoomCapability: zoomCaps,
+          panTiltCapability: ptCaps,
           jpegQuality: 0.85,
           requestedConstraints: videoConstraints,
           negotiatedResolution: `${settings.width} x ${settings.height}`,
@@ -473,7 +474,7 @@ export default function App() {
               {isMockMode && <div css={mockBadge}>Mock: {mockProfile}</div>}
               {showZoomPrompt && (
                 <div css={zoomPromptBanner}>
-                  Try sliding the zoom control to capture zoom behavior
+                  Try sliding the zoom control to capture zoom and tilt behavior
                 </div>
               )}
               <Webcam
