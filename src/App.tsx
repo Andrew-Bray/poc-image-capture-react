@@ -13,7 +13,7 @@ import { DigitalCropControls } from './components/DigitalCropControls';
 import { CaptureComparison } from './components/CaptureComparison';
 import { JsonResultsPanel } from './components/JsonResultsPanel';
 import { panel, panelTitle, buttonPrimary, buttonSecondary, buttonSuccess, colors } from './styles/theme';
-import type { JsonData, StatusType, ZoomCapabilities, CaptureStats } from './types';
+import type { JsonData, StatusType, ZoomCapabilities, CaptureStats, CameraInfo } from './types';
 
 const appContainer = css`
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -156,14 +156,41 @@ export default function App() {
           setTrack(track);
         }
 
-        setJsonData({
-          cameraInfo: {
-            capabilities,
-            currentSettings: settings,
-            photoCapabilities,
-            supportedConstraints: navigator.mediaDevices.getSupportedConstraints(),
-          },
-        });
+        // Determine camera label
+        const cameraLabel = isMockMode
+          ? `Mock ${mockProfile === 'brio' ? 'BRIO' : 'Standard'}`
+          : settings.label || 'Unknown Camera';
+
+        // Get all available video input devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const availableDevices = devices
+          .filter((d) => d.kind === 'videoinput')
+          .map((d) => ({
+            label: d.label || 'Unknown Device',
+            deviceId: d.deviceId,
+          }));
+
+        const cameraInfo: CameraInfo = {
+          label: cameraLabel,
+          browser: navigator.userAgent,
+          imageCapturAvailable: typeof ImageCapture !== 'undefined',
+          zoomCapability: zoomCaps,
+          jpegQuality: 0.85,
+          requestedConstraints: videoConstraints,
+          negotiatedResolution: `${settings.width} x ${settings.height}`,
+          availableDevices,
+          capabilities,
+          currentSettings: settings,
+          photoCapabilities,
+          supportedConstraints: navigator.mediaDevices.getSupportedConstraints(),
+        };
+
+        // Only include isMockCamera when true
+        if (isMockMode) {
+          cameraInfo.isMockCamera = true;
+        }
+
+        setJsonData({ cameraInfo });
 
         setIsRunning(true);
         const mockLabel = isMockMode ? ` [MOCK: ${mockProfile}]` : '';

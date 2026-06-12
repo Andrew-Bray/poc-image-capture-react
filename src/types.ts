@@ -13,13 +13,29 @@ export interface CropZoomStats {
   fileSizeKB: string;
 }
 
+export interface AvailableDevice {
+  label: string;
+  deviceId: string;
+}
+
+export interface CameraInfo {
+  label: string;
+  browser: string;
+  imageCapturAvailable: boolean;
+  zoomCapability: ZoomCapabilities | null;
+  jpegQuality: number;
+  isMockCamera?: boolean;
+  requestedConstraints: MediaTrackConstraints;
+  negotiatedResolution: string;
+  availableDevices: AvailableDevice[];
+  capabilities: MediaTrackCapabilities;
+  currentSettings: MediaTrackSettings;
+  photoCapabilities?: PhotoCapabilities | { error: string };
+  supportedConstraints: MediaTrackSupportedConstraints;
+}
+
 export interface JsonData {
-  cameraInfo?: {
-    capabilities: MediaTrackCapabilities;
-    currentSettings: MediaTrackSettings;
-    photoCapabilities?: PhotoCapabilities | { error: string };
-    supportedConstraints: MediaTrackSupportedConstraints;
-  };
+  cameraInfo?: CameraInfo;
   takePhotoCapture?: CaptureStats;
   frameGrabCapture?: CaptureStats;
   digitalCropZoom?: CropZoomStats;
