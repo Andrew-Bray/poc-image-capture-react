@@ -31,7 +31,7 @@ async function centerCropToAspectRatio(
   srcWidth: number,
   srcHeight: number,
   targetAspectRatio: number,
-  quality = 0.92
+  quality = 0.95
 ): Promise<{ blob: Blob; width: number; height: number }> {
   const srcAspectRatio = srcWidth / srcHeight;
 

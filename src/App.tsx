@@ -401,7 +401,8 @@ export default function App() {
                 onUserMedia={handleUserMedia}
                 onUserMediaError={handleUserMediaError}
                 screenshotFormat="image/jpeg"
-                screenshotQuality={0.85}
+                screenshotQuality={0.95}
+                forceScreenshotSourceSize={true}
               />
             </div>
 
