@@ -7,6 +7,7 @@ import { useZoomControl } from './hooks/useZoomControl';
 import { useDigitalCropZoom } from './hooks/useDigitalCropZoom';
 import { useMockZoom, getVisualZoomScale } from './hooks/useMockZoom';
 import { useVideoRecording } from './hooks/useVideoRecording';
+import { uploadRecording } from './utils/uploadRecording';
 import { StepBadge } from './components/StepBadge';
 import { StatusBar } from './components/StatusBar';
 import { ZoomControls, ZoomNotSupported } from './components/ZoomControls';
@@ -437,7 +438,15 @@ export default function App() {
                     </button>
                   ) : (
                     <>
-                      <button css={buttonSecondary} onClick={stopRecording}>
+                      <button
+                        css={buttonSecondary}
+                        onClick={async () => {
+                          const blob = await stopRecording();
+                          if (blob.size > 0) {
+                            uploadRecording(blob, jsonData.cameraInfo?.label || 'unknown');
+                          }
+                        }}
+                      >
                         Stop Recording
                       </button>
                       <div css={recordingIndicator}>

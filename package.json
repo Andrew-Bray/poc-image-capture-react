@@ -16,6 +16,7 @@
     "react-webcam": "^7.2.0"
   },
   "devDependencies": {
+    "@netlify/functions": "^2.8.0",
     "@rsbuild/core": "^2.0.9",
     "@rsbuild/plugin-react": "^2.0.1",
     "@types/react": "^19.2.15",
