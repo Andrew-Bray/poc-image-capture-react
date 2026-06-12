@@ -11,6 +11,7 @@ import { useVideoRecording } from './hooks/useVideoRecording';
 import { useMockZoomStream } from './hooks/useMockZoomStream';
 import { uploadRecording } from './utils/uploadRecording';
 import { uploadCapture } from './utils/uploadCapture';
+import { getDeviceInfo } from './utils/getDeviceInfo';
 import { StepBadge } from './components/StepBadge';
 import { StatusBar } from './components/StatusBar';
 import { ZoomControls, ZoomNotSupported } from './components/ZoomControls';
@@ -276,9 +277,13 @@ export default function App() {
             deviceId: d.deviceId,
           }));
 
+        // Get device info (includes async Client Hints)
+        const deviceInfo = await getDeviceInfo();
+
         const cameraInfo: CameraInfo = {
           label: cameraLabel,
           browser: navigator.userAgent,
+          deviceInfo,
           imageCapturAvailable: typeof ImageCapture !== 'undefined',
           zoomCapability: zoomCaps,
           panTiltCapability: ptCaps,

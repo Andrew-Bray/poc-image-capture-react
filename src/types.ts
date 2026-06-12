@@ -20,9 +20,20 @@ export interface AvailableDevice {
   deviceId: string;
 }
 
+export interface DeviceInfo {
+  hardwareConcurrency: number;
+  deviceMemory?: number;
+  platform: string;
+  architecture?: string;
+  model?: string;
+  platformVersion?: string;
+  mobile?: boolean;
+}
+
 export interface CameraInfo {
   label: string;
   browser: string;
+  deviceInfo: DeviceInfo;
   imageCapturAvailable: boolean;
   zoomCapability: ZoomCapabilities | null;
   panTiltCapability: PanTiltCapabilities | null;
