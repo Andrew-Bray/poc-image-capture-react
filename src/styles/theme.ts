@@ -90,6 +90,16 @@ export const buttonSuccess = css`
   }
 `;
 
+export const buttonDanger = css`
+  ${buttonBase}
+  background: ${colors.error};
+  color: ${colors.white};
+
+  &:hover:not(:disabled) {
+    background: #b71c1c;
+  }
+`;
+
 export const controlsBox = css`
   margin: 16px 0;
   padding: 16px;

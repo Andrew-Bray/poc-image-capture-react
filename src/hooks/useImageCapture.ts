@@ -22,10 +22,56 @@ interface UseImageCaptureReturn {
   track: MediaStreamTrack | null;
 }
 
+/**
+ * Center-crop an image blob to match a target aspect ratio.
+ * Used to normalize takePhoto() output to match the video stream's framing.
+ */
+async function centerCropToAspectRatio(
+  blob: Blob,
+  srcWidth: number,
+  srcHeight: number,
+  targetAspectRatio: number,
+  quality = 0.92
+): Promise<{ blob: Blob; width: number; height: number }> {
+  const srcAspectRatio = srcWidth / srcHeight;
+
+  let cropWidth: number;
+  let cropHeight: number;
+  let offsetX: number;
+  let offsetY: number;
+
+  if (srcAspectRatio > targetAspectRatio) {
+    // Source is wider than target — crop sides
+    cropHeight = srcHeight;
+    cropWidth = Math.round(srcHeight * targetAspectRatio);
+    offsetX = Math.round((srcWidth - cropWidth) / 2);
+    offsetY = 0;
+  } else {
+    // Source is taller than target — crop top/bottom
+    cropWidth = srcWidth;
+    cropHeight = Math.round(srcWidth / targetAspectRatio);
+    offsetX = 0;
+    offsetY = Math.round((srcHeight - cropHeight) / 2);
+  }
+
+  // Create offscreen canvas and draw cropped region
+  const canvas = new OffscreenCanvas(cropWidth, cropHeight);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get canvas context');
+
+  const img = await createImageBitmap(blob);
+  ctx.drawImage(img, offsetX, offsetY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+  img.close();
+
+  const croppedBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+  return { blob: croppedBlob, width: cropWidth, height: cropHeight };
+}
+
 export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageCaptureReturn {
   const { mockZoomCapabilities } = options;
   const [imageCapture, setImageCapture] = useState<ImageCapture | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const videoAspectRatioRef = useRef<number>(16 / 9);
 
   const initImageCapture = useCallback(async (stream: MediaStream) => {
     const videoTrack = stream.getVideoTracks()[0];
@@ -39,6 +85,11 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
 
     const capabilities = videoTrack.getCapabilities();
     const settings = videoTrack.getSettings();
+
+    // Store video stream aspect ratio as ground truth for takePhoto cropping
+    if (settings.width && settings.height) {
+      videoAspectRatioRef.current = settings.width / settings.height;
+    }
 
     let photoCapabilities: PhotoCapabilities | { error: string };
     try {
@@ -95,14 +146,40 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
       }
 
       const startTime = performance.now();
-      const blob = await imageCapture.takePhoto();
+      let blob = await imageCapture.takePhoto();
       const captureTime = performance.now() - startTime;
 
       // Get dimensions by loading the image
       const img = await createImageBitmap(blob);
-      const width = img.width;
-      const height = img.height;
+      let width = img.width;
+      let height = img.height;
       img.close();
+
+      // Center-crop to match video stream aspect ratio if they differ
+      // This ensures takePhoto output matches what the user sees in the preview
+      //
+      // ALTERNATIVE APPROACH (not implemented):
+      // Instead of cropping takePhoto to match video, we could adjust the video
+      // preview to match takePhoto's native aspect ratio. This would mean:
+      // 1. Do a silent takePhoto() at camera init to discover the photo aspect ratio
+      // 2. Apply CSS cropping/letterboxing to the video preview to match
+      // 3. Skip cropping here — takePhoto output IS the ground truth
+      // This might be preferable if takePhoto's framing is the "true" sensor output
+      // and we want the preview to accurately represent what will be captured.
+      //
+      const photoAspectRatio = width / height;
+      const videoAspectRatio = videoAspectRatioRef.current;
+      const aspectRatioDiff = Math.abs(photoAspectRatio - videoAspectRatio);
+
+      if (aspectRatioDiff > 0.01) {
+        console.log(
+          `[takePhoto] Cropping to match video stream: photo=${photoAspectRatio.toFixed(3)}, video=${videoAspectRatio.toFixed(3)}`
+        );
+        const cropped = await centerCropToAspectRatio(blob, width, height, videoAspectRatio);
+        blob = cropped.blob;
+        width = cropped.width;
+        height = cropped.height;
+      }
 
       const stats: CaptureStats = {
         resolution: `${width} x ${height}`,

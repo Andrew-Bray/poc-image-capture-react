@@ -6,13 +6,14 @@ import { useImageCapture } from './hooks/useImageCapture';
 import { useZoomControl } from './hooks/useZoomControl';
 import { useDigitalCropZoom } from './hooks/useDigitalCropZoom';
 import { useMockZoom, getVisualZoomScale } from './hooks/useMockZoom';
+import { useVideoRecording } from './hooks/useVideoRecording';
 import { StepBadge } from './components/StepBadge';
 import { StatusBar } from './components/StatusBar';
 import { ZoomControls, ZoomNotSupported } from './components/ZoomControls';
 import { DigitalCropControls } from './components/DigitalCropControls';
 import { CaptureComparison } from './components/CaptureComparison';
 import { JsonResultsPanel } from './components/JsonResultsPanel';
-import { panel, panelTitle, buttonPrimary, buttonSecondary, buttonSuccess, colors } from './styles/theme';
+import { panel, panelTitle, buttonPrimary, buttonSecondary, buttonSuccess, buttonDanger, colors } from './styles/theme';
 import type { JsonData, StatusType, ZoomCapabilities, CaptureStats, CameraInfo } from './types';
 
 const appContainer = css`
@@ -88,6 +89,28 @@ const mockBadge = css`
   z-index: 10;
 `;
 
+const recordingIndicator = css`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: ${colors.error};
+  font-weight: 600;
+  font-size: 14px;
+`;
+
+const recordingDot = css`
+  width: 10px;
+  height: 10px;
+  background: ${colors.error};
+  border-radius: 50%;
+  animation: pulse 1s ease-in-out infinite;
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+`;
+
 const captureDescription = css`
   color: ${colors.gray[500]};
   font-size: 14px;
@@ -97,7 +120,8 @@ const captureDescription = css`
 const videoConstraints: MediaTrackConstraints = {
   width: { ideal: 4096 },
   height: { ideal: 2160 },
-  facingMode: 'environment',
+  aspectRatio: { min: 1.0, ideal: 1.7777777778 }
+  // facingMode: 'environment',
 };
 
 export default function App() {
@@ -129,6 +153,15 @@ export default function App() {
     isMockMode,
   });
   const { cropFactor, cropDisplay, setCropFactor, applyCropZoom, croppedImageUrl } = useDigitalCropZoom();
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+    recordingDuration,
+    recordedBlob,
+    downloadRecording,
+    clearRecording,
+  } = useVideoRecording();
 
   const hasHardwareZoom = zoomCapabilities !== null;
   const hasCaptureData = takePhotoStats !== null || frameGrabStats !== null;
@@ -364,7 +397,9 @@ export default function App() {
               <button
                 css={buttonSecondary}
                 disabled={!isRunning}
-                onClick={() => {
+                onClick={async () => {
+                  if (isRecording) await stopRecording();
+                  clearRecording();
                   streamRef?.getTracks().forEach((t) => t.stop());
                   cleanupImageCapture();
                   setIsRunning(false);
@@ -389,6 +424,39 @@ export default function App() {
                 ) : (
                   <ZoomNotSupported />
                 )}
+
+                {/* Recording controls */}
+                <div css={buttonRow}>
+                  {!isRecording ? (
+                    <button
+                      css={buttonDanger}
+                      onClick={() => streamRef && startRecording(streamRef)}
+                      disabled={!streamRef}
+                    >
+                      Record Video
+                    </button>
+                  ) : (
+                    <>
+                      <button css={buttonSecondary} onClick={stopRecording}>
+                        Stop Recording
+                      </button>
+                      <div css={recordingIndicator}>
+                        <div css={recordingDot} />
+                        {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                      </div>
+                    </>
+                  )}
+                  {recordedBlob && !isRecording && (
+                    <>
+                      <button css={buttonPrimary} onClick={downloadRecording}>
+                        Download Video
+                      </button>
+                      <button css={buttonSecondary} onClick={clearRecording}>
+                        Discard
+                      </button>
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
