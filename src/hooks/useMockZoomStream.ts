@@ -1,14 +1,20 @@
 import { useRef, useCallback } from 'react';
 import type { MutableRefObject } from 'react';
 
+interface PTZRefs {
+  zoomScale: MutableRefObject<number>;
+  panOffset: MutableRefObject<number>;
+  tiltOffset: MutableRefObject<number>;
+}
+
 interface UseMockZoomStreamReturn {
   /**
-   * Start capturing a zoomed stream from a video element.
+   * Start capturing a PTZ-transformed stream from a video element.
    * Returns a MediaStream that can be passed to MediaRecorder.
    * @param video - The source video element
-   * @param zoomScaleRef - A ref containing the current zoom scale (read each frame)
+   * @param ptzRefs - Refs containing current zoom scale and pan/tilt offsets (read each frame)
    */
-  startZoomStream: (video: HTMLVideoElement, zoomScaleRef: MutableRefObject<number>) => MediaStream;
+  startZoomStream: (video: HTMLVideoElement, ptzRefs: PTZRefs) => MediaStream;
   /**
    * Stop the zoom stream capture and clean up resources.
    */
@@ -24,7 +30,7 @@ export function useMockZoomStream(): UseMockZoomStreamReturn {
   const animationIdRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const startZoomStream = useCallback((video: HTMLVideoElement, zoomScaleRef: MutableRefObject<number>): MediaStream => {
+  const startZoomStream = useCallback((video: HTMLVideoElement, ptzRefs: PTZRefs): MediaStream => {
     // Clean up any existing stream
     if (animationIdRef.current) {
       cancelAnimationFrame(animationIdRef.current);
@@ -44,18 +50,24 @@ export function useMockZoomStream(): UseMockZoomStreamReturn {
       throw new Error('Could not get canvas 2d context');
     }
 
-    // Animation loop to draw zoomed frames
+    // Animation loop to draw PTZ-transformed frames
     const drawFrame = () => {
       if (!ctx || !canvasRef.current) return;
 
-      const currentZoom = zoomScaleRef.current;
+      const currentZoom = ptzRefs.zoomScale.current;
+      const panOffsetPercent = ptzRefs.panOffset.current;
+      const tiltOffsetPercent = ptzRefs.tiltOffset.current;
+
+      // Convert percentage offsets to pixels
+      const panOffsetPx = (panOffsetPercent / 100) * width;
+      const tiltOffsetPx = (tiltOffsetPercent / 100) * height;
 
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
-      // Apply zoom transform (scale from center)
+      // Apply PTZ transform: translate for pan/tilt, then scale from center
       ctx.save();
-      ctx.translate(width / 2, height / 2);
+      ctx.translate(width / 2 + panOffsetPx, height / 2 + tiltOffsetPx);
       ctx.scale(currentZoom, currentZoom);
       ctx.translate(-width / 2, -height / 2);
 

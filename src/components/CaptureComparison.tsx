@@ -102,6 +102,18 @@ function StatsDisplay({ data }: { data: CaptureStats | CropZoomStats | null }) {
             Hardware zoom: {data.hardwareZoom}
           </>
         )}
+        {data.hardwarePan && (
+          <>
+            <br />
+            Hardware pan: {data.hardwarePan}
+          </>
+        )}
+        {data.hardwareTilt && (
+          <>
+            <br />
+            Hardware tilt: {data.hardwareTilt}
+          </>
+        )}
       </div>
     );
   }

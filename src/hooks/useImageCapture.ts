@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
-import type { CaptureStats, ZoomCapabilities } from '../types';
+import type { CaptureStats, ZoomCapabilities, PanTiltCapabilities } from '../types';
 
 interface UseImageCaptureOptions {
   /** Mock zoom capabilities to inject (for testing without hardware zoom) */
   mockZoomCapabilities?: ZoomCapabilities | null;
+  /** Mock pan/tilt capabilities to inject (for testing without hardware PTZ) */
+  mockPanTiltCapabilities?: PanTiltCapabilities | null;
 }
 
 interface UseImageCaptureReturn {
@@ -13,8 +15,13 @@ interface UseImageCaptureReturn {
     settings: MediaTrackSettings;
     photoCapabilities: PhotoCapabilities | { error: string };
     zoomCapabilities: ZoomCapabilities | null;
+    panTiltCapabilities: PanTiltCapabilities | null;
   }>;
-  takePhoto: (zoomCapabilities: ZoomCapabilities | null, mockZoomValue?: number) => Promise<{
+  takePhoto: (
+    zoomCapabilities: ZoomCapabilities | null,
+    panTiltCapabilities: PanTiltCapabilities | null,
+    mockPTZValues?: { zoom?: number; pan?: number; tilt?: number }
+  ) => Promise<{
     blob: Blob;
     stats: CaptureStats;
   }>;
@@ -68,7 +75,7 @@ async function centerCropToAspectRatio(
 }
 
 export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageCaptureReturn {
-  const { mockZoomCapabilities } = options;
+  const { mockZoomCapabilities, mockPanTiltCapabilities } = options;
   const [imageCapture, setImageCapture] = useState<ImageCapture | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const videoAspectRatioRef = useRef<number>(16 / 9);
@@ -131,16 +138,62 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
       }
     }
 
+    // Check for hardware pan/tilt support (or use mock capabilities)
+    let panTiltCapabilities: PanTiltCapabilities | null = null;
+
+    if (mockPanTiltCapabilities) {
+      // Mock mode: inject fake pan/tilt capabilities for testing
+      panTiltCapabilities = mockPanTiltCapabilities;
+      console.log('[MockPTZ] Injecting fake pan/tilt capabilities:', mockPanTiltCapabilities);
+    } else {
+      // Real mode: detect actual hardware pan/tilt
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const caps = capabilities as any;
+      const panCap = caps.pan;
+      const tiltCap = caps.tilt;
+
+      const hasPan = panCap && typeof panCap === 'object' && 'min' in panCap && 'max' in panCap;
+      const hasTilt = tiltCap && typeof tiltCap === 'object' && 'min' in tiltCap && 'max' in tiltCap;
+
+      if (hasPan || hasTilt) {
+        panTiltCapabilities = {
+          pan: hasPan
+            ? { min: panCap.min, max: panCap.max, step: panCap.step || 1 }
+            : null,
+          tilt: hasTilt
+            ? { min: tiltCap.min, max: tiltCap.max, step: tiltCap.step || 1 }
+            : null,
+        };
+
+        // Reset pan/tilt to center (0) on startup
+        try {
+          const resetConstraints: MediaTrackConstraintSet[] = [];
+          if (hasPan) resetConstraints.push({ pan: 0 } as MediaTrackConstraintSet);
+          if (hasTilt) resetConstraints.push({ tilt: 0 } as MediaTrackConstraintSet);
+          if (resetConstraints.length > 0) {
+            await videoTrack.applyConstraints({ advanced: resetConstraints });
+          }
+        } catch {
+          // Ignore pan/tilt reset errors
+        }
+      }
+    }
+
     return {
       capabilities,
       settings,
       photoCapabilities,
       zoomCapabilities,
+      panTiltCapabilities,
     };
-  }, [mockZoomCapabilities]);
+  }, [mockZoomCapabilities, mockPanTiltCapabilities]);
 
   const takePhoto = useCallback(
-    async (zoomCapabilities: ZoomCapabilities | null, mockZoomValue?: number) => {
+    async (
+      zoomCapabilities: ZoomCapabilities | null,
+      panTiltCapabilities: PanTiltCapabilities | null,
+      mockPTZValues?: { zoom?: number; pan?: number; tilt?: number }
+    ) => {
       if (!imageCapture || !trackRef.current) {
         throw new Error('ImageCapture not initialized');
       }
@@ -188,18 +241,41 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
         captureTimeMs: captureTime.toFixed(0) + ' ms',
       };
 
+      // Get current track settings for hardware values
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const currentSettings = trackRef.current.getSettings() as any;
+
       // If hardware zoom is active, record the current zoom level
       if (zoomCapabilities) {
         let currentZoom: number;
-        if (mockZoomValue !== undefined) {
-          // Mock mode: use the provided simulated zoom value
-          currentZoom = mockZoomValue;
+        if (mockPTZValues?.zoom !== undefined) {
+          currentZoom = mockPTZValues.zoom;
         } else {
-          // Real mode: get zoom from track settings
-          const currentSettings = trackRef.current.getSettings();
           currentZoom = currentSettings.zoom ?? zoomCapabilities.min;
         }
         stats.hardwareZoom = formatZoom(currentZoom, zoomCapabilities);
+      }
+
+      // If hardware pan is active, record the current pan angle
+      if (panTiltCapabilities?.pan) {
+        let currentPan: number;
+        if (mockPTZValues?.pan !== undefined) {
+          currentPan = mockPTZValues.pan;
+        } else {
+          currentPan = currentSettings.pan ?? 0;
+        }
+        stats.hardwarePan = formatAngle(currentPan);
+      }
+
+      // If hardware tilt is active, record the current tilt angle
+      if (panTiltCapabilities?.tilt) {
+        let currentTilt: number;
+        if (mockPTZValues?.tilt !== undefined) {
+          currentTilt = mockPTZValues.tilt;
+        } else {
+          currentTilt = currentSettings.tilt ?? 0;
+        }
+        stats.hardwareTilt = formatAngle(currentTilt);
       }
 
       return { blob, stats };
@@ -228,4 +304,10 @@ export function formatZoom(rawValue: number, zoomCapabilities: ZoomCapabilities)
   // If min >= 10, it's a percentage-based scale (e.g., 100 = 1x)
   const displayValue = min >= 10 ? rawValue / min : rawValue;
   return `${displayValue.toFixed(1)}x`;
+}
+
+// Format pan/tilt angle values for display
+function formatAngle(value: number): string {
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(0)}°`;
 }

@@ -5,7 +5,8 @@ import Webcam from 'react-webcam';
 import { useImageCapture } from './hooks/useImageCapture';
 import { useZoomControl } from './hooks/useZoomControl';
 import { useDigitalCropZoom } from './hooks/useDigitalCropZoom';
-import { useMockZoom, getVisualZoomScale } from './hooks/useMockZoom';
+import { useMockZoom, getVisualZoomScale, getVisualPanOffset, getVisualTiltOffset } from './hooks/useMockZoom';
+import { usePanTiltControl } from './hooks/usePanTiltControl';
 import { useVideoRecording } from './hooks/useVideoRecording';
 import { useMockZoomStream } from './hooks/useMockZoomStream';
 import { uploadRecording } from './utils/uploadRecording';
@@ -13,11 +14,12 @@ import { uploadCapture } from './utils/uploadCapture';
 import { StepBadge } from './components/StepBadge';
 import { StatusBar } from './components/StatusBar';
 import { ZoomControls, ZoomNotSupported } from './components/ZoomControls';
+import { PanTiltControls } from './components/PanTiltControls';
 import { DigitalCropControls } from './components/DigitalCropControls';
 import { CaptureComparison } from './components/CaptureComparison';
 import { JsonResultsPanel } from './components/JsonResultsPanel';
 import { panel, panelTitle, buttonPrimary, buttonSecondary, buttonSuccess, buttonDanger, colors } from './styles/theme';
-import type { JsonData, StatusType, ZoomCapabilities, CaptureStats, CameraInfo } from './types';
+import type { JsonData, StatusType, ZoomCapabilities, PanTiltCapabilities, CaptureStats, CameraInfo } from './types';
 
 const appContainer = css`
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -156,6 +158,7 @@ export default function App() {
   });
   const [jsonData, setJsonData] = useState<JsonData>({});
   const [zoomCapabilities, setZoomCapabilities] = useState<ZoomCapabilities | null>(null);
+  const [panTiltCapabilities, setPanTiltCapabilities] = useState<PanTiltCapabilities | null>(null);
   const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
 
   // Capture results
@@ -169,16 +172,26 @@ export default function App() {
   // Zoom prompt banner
   const [showZoomPrompt, setShowZoomPrompt] = useState(false);
 
-  // Mock zoom mode
-  const { mockProfile, mockCapabilities, isMockMode } = useMockZoom();
+  // Mock PTZ mode
+  const { mockProfile, mockCapabilities, mockPanTiltCapabilities, isMockMode } = useMockZoom();
 
   // Hooks with mock support
   const { initImageCapture, takePhoto, cleanup: cleanupImageCapture } = useImageCapture({
     mockZoomCapabilities: mockCapabilities,
+    mockPanTiltCapabilities: mockPanTiltCapabilities,
   });
   const { zoomValue, zoomDisplay, applyZoom, setTrack } = useZoomControl(zoomCapabilities, {
     isMockMode,
   });
+  const {
+    panValue,
+    tiltValue,
+    panDisplay,
+    tiltDisplay,
+    applyPan,
+    applyTilt,
+    setTrack: setPanTiltTrack,
+  } = usePanTiltControl(panTiltCapabilities, { isMockMode });
   const { cropFactor, cropDisplay, setCropFactor, applyCropZoom, croppedImageUrl } = useDigitalCropZoom();
   const {
     isRecording,
@@ -192,19 +205,41 @@ export default function App() {
   const { startZoomStream, stopZoomStream } = useMockZoomStream();
 
   const hasHardwareZoom = zoomCapabilities !== null;
+  const hasHardwarePanTilt = panTiltCapabilities !== null;
   const hasCaptureData = takePhotoStats !== null || frameGrabStats !== null;
 
-  // Calculate visual zoom scale for CSS transform (only in mock mode)
+  // Calculate visual transforms for CSS (only in mock mode)
   const visualZoomScale = useMemo(() => {
     if (!isMockMode || !zoomCapabilities) return 1;
     return getVisualZoomScale(zoomValue, zoomCapabilities);
   }, [isMockMode, zoomCapabilities, zoomValue]);
 
-  // Ref for zoom scale so mock zoom recording can read latest value each frame
+  const visualPanOffset = useMemo(() => {
+    if (!isMockMode || !panTiltCapabilities?.pan) return 0;
+    return getVisualPanOffset(panValue, panTiltCapabilities.pan);
+  }, [isMockMode, panTiltCapabilities, panValue]);
+
+  const visualTiltOffset = useMemo(() => {
+    if (!isMockMode || !panTiltCapabilities?.tilt) return 0;
+    return getVisualTiltOffset(tiltValue, panTiltCapabilities.tilt);
+  }, [isMockMode, panTiltCapabilities, tiltValue]);
+
+  // Refs for PTZ values so mock recording can read latest values each frame
   const visualZoomScaleRef = useRef(visualZoomScale);
+  const visualPanOffsetRef = useRef(visualPanOffset);
+  const visualTiltOffsetRef = useRef(visualTiltOffset);
+
   useEffect(() => {
     visualZoomScaleRef.current = visualZoomScale;
   }, [visualZoomScale]);
+
+  useEffect(() => {
+    visualPanOffsetRef.current = visualPanOffset;
+  }, [visualPanOffset]);
+
+  useEffect(() => {
+    visualTiltOffsetRef.current = visualTiltOffset;
+  }, [visualTiltOffset]);
 
   // Handle stream from react-webcam
   const handleUserMedia = useCallback(
@@ -213,14 +248,18 @@ export default function App() {
       setStatus({ message: 'Initializing camera...', type: 'info' });
 
       try {
-        const { capabilities, settings, photoCapabilities, zoomCapabilities: zoomCaps } =
+        const { capabilities, settings, photoCapabilities, zoomCapabilities: zoomCaps, panTiltCapabilities: ptCaps } =
           await initImageCapture(stream);
 
         setZoomCapabilities(zoomCaps);
+        setPanTiltCapabilities(ptCaps);
 
+        const track = stream.getVideoTracks()[0];
         if (zoomCaps) {
-          const track = stream.getVideoTracks()[0];
           setTrack(track);
+        }
+        if (ptCaps) {
+          setPanTiltTrack(track);
         }
 
         // Determine camera label
@@ -296,10 +335,11 @@ export default function App() {
 
     try {
       // Method 1: ImageCapture.takePhoto()
-      // Pass mock zoom value when in mock mode
+      // Pass mock PTZ values when in mock mode
       const { blob, stats } = await takePhoto(
         zoomCapabilities,
-        isMockMode ? zoomValue : undefined
+        panTiltCapabilities,
+        isMockMode ? { zoom: zoomValue, pan: panValue, tilt: tiltValue } : undefined
       );
 
       // Cleanup old URL
@@ -439,7 +479,7 @@ export default function App() {
               <Webcam
                 ref={webcamRef}
                 audio={false}
-                css={[videoStyle, { transform: `scale(${visualZoomScale})` }]}
+                css={[videoStyle, { transform: `translate(${visualPanOffset}%, ${visualTiltOffset}%) scale(${visualZoomScale})` }]}
                 videoConstraints={videoConstraints}
                 onUserMedia={handleUserMedia}
                 onUserMediaError={handleUserMediaError}
@@ -485,6 +525,20 @@ export default function App() {
                   <ZoomNotSupported />
                 )}
 
+                {hasHardwarePanTilt && panTiltCapabilities && (
+                  <PanTiltControls
+                    pan={panValue}
+                    tilt={tiltValue}
+                    panDisplay={panDisplay}
+                    tiltDisplay={tiltDisplay}
+                    onPanChange={applyPan}
+                    onTiltChange={applyTilt}
+                    panCapabilities={panTiltCapabilities.pan}
+                    tiltCapabilities={panTiltCapabilities.tilt}
+                    isMockMode={isMockMode}
+                  />
+                )}
+
                 {/* Recording controls */}
                 <div css={buttonRow}>
                   {!isRecording ? (
@@ -495,10 +549,14 @@ export default function App() {
                           if (hasHardwareZoom || isMockMode) {
                             setShowZoomPrompt(true);
                           }
-                          // In mock mode, record from zoomed canvas stream
+                          // In mock mode, record from PTZ-transformed canvas stream
                           if (isMockMode && webcamRef.current?.video) {
-                            const zoomStream = startZoomStream(webcamRef.current.video, visualZoomScaleRef);
-                            startRecording(zoomStream);
+                            const ptzStream = startZoomStream(webcamRef.current.video, {
+                              zoomScale: visualZoomScaleRef,
+                              panOffset: visualPanOffsetRef,
+                              tiltOffset: visualTiltOffsetRef,
+                            });
+                            startRecording(ptzStream);
                           } else {
                             startRecording(streamRef);
                           }

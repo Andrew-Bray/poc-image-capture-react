@@ -4,6 +4,8 @@ export interface CaptureStats {
   fileSizeKB: string;
   captureTimeMs: string;
   hardwareZoom?: string;
+  hardwarePan?: string;
+  hardwareTilt?: string;
 }
 
 export interface CropZoomStats {
@@ -47,4 +49,9 @@ export interface ZoomCapabilities {
   min: number;
   max: number;
   step: number;
+}
+
+export interface PanTiltCapabilities {
+  pan: { min: number; max: number; step: number } | null;
+  tilt: { min: number; max: number; step: number } | null;
 }
