@@ -7,6 +7,7 @@ import { useZoomControl } from './hooks/useZoomControl';
 import { useDigitalCropZoom } from './hooks/useDigitalCropZoom';
 import { useMockZoom, getVisualZoomScale } from './hooks/useMockZoom';
 import { useVideoRecording } from './hooks/useVideoRecording';
+import { useMockZoomStream } from './hooks/useMockZoomStream';
 import { uploadRecording } from './utils/uploadRecording';
 import { uploadCapture } from './utils/uploadCapture';
 import { StepBadge } from './components/StepBadge';
@@ -91,6 +92,26 @@ const mockBadge = css`
   z-index: 10;
 `;
 
+const zoomPromptBanner = css`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  z-index: 20;
+  animation: fadeIn 0.2s ease-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`;
+
 const recordingIndicator = css`
   display: flex;
   align-items: center;
@@ -145,6 +166,9 @@ export default function App() {
   const [frameGrabStats, setFrameGrabStats] = useState<CaptureStats | null>(null);
   const [frameGrabBlob, setFrameGrabBlob] = useState<Blob | null>(null);
 
+  // Zoom prompt banner
+  const [showZoomPrompt, setShowZoomPrompt] = useState(false);
+
   // Mock zoom mode
   const { mockProfile, mockCapabilities, isMockMode } = useMockZoom();
 
@@ -165,6 +189,7 @@ export default function App() {
     downloadRecording,
     clearRecording,
   } = useVideoRecording();
+  const { startZoomStream, stopZoomStream } = useMockZoomStream();
 
   const hasHardwareZoom = zoomCapabilities !== null;
   const hasCaptureData = takePhotoStats !== null || frameGrabStats !== null;
@@ -174,6 +199,12 @@ export default function App() {
     if (!isMockMode || !zoomCapabilities) return 1;
     return getVisualZoomScale(zoomValue, zoomCapabilities);
   }, [isMockMode, zoomCapabilities, zoomValue]);
+
+  // Ref for zoom scale so mock zoom recording can read latest value each frame
+  const visualZoomScaleRef = useRef(visualZoomScale);
+  useEffect(() => {
+    visualZoomScaleRef.current = visualZoomScale;
+  }, [visualZoomScale]);
 
   // Handle stream from react-webcam
   const handleUserMedia = useCallback(
@@ -370,6 +401,13 @@ export default function App() {
     };
   }, []);
 
+  // Auto-hide zoom prompt after 3 seconds
+  useEffect(() => {
+    if (!showZoomPrompt) return;
+    const timeout = setTimeout(() => setShowZoomPrompt(false), 3000);
+    return () => clearTimeout(timeout);
+  }, [showZoomPrompt]);
+
   // Step badge states
   const step1State = jsonData.cameraInfo ? 'complete' : 'active';
   const step2State = hasCaptureData ? 'complete' : jsonData.cameraInfo ? 'active' : 'inactive';
@@ -393,6 +431,11 @@ export default function App() {
 
             <div css={videoContainer}>
               {isMockMode && <div css={mockBadge}>Mock: {mockProfile}</div>}
+              {showZoomPrompt && (
+                <div css={zoomPromptBanner}>
+                  Try sliding the zoom control to capture zoom behavior
+                </div>
+              )}
               <Webcam
                 ref={webcamRef}
                 audio={false}
@@ -415,6 +458,7 @@ export default function App() {
                 disabled={!isRunning}
                 onClick={async () => {
                   if (isRecording) await stopRecording();
+                  stopZoomStream(); // Clean up mock zoom stream if active
                   clearRecording();
                   streamRef?.getTracks().forEach((t) => t.stop());
                   cleanupImageCapture();
@@ -446,7 +490,20 @@ export default function App() {
                   {!isRecording ? (
                     <button
                       css={buttonDanger}
-                      onClick={() => streamRef && startRecording(streamRef)}
+                      onClick={() => {
+                        if (streamRef) {
+                          if (hasHardwareZoom || isMockMode) {
+                            setShowZoomPrompt(true);
+                          }
+                          // In mock mode, record from zoomed canvas stream
+                          if (isMockMode && webcamRef.current?.video) {
+                            const zoomStream = startZoomStream(webcamRef.current.video, visualZoomScaleRef);
+                            startRecording(zoomStream);
+                          } else {
+                            startRecording(streamRef);
+                          }
+                        }
+                      }}
                       disabled={!streamRef}
                     >
                       Record Video
@@ -457,6 +514,9 @@ export default function App() {
                         css={buttonSecondary}
                         onClick={async () => {
                           const blob = await stopRecording();
+                          if (isMockMode) {
+                            stopZoomStream();
+                          }
                           if (blob.size > 0) {
                             uploadRecording(blob, jsonData.cameraInfo?.label || 'unknown');
                           }
