@@ -8,6 +8,7 @@ import { useDigitalCropZoom } from './hooks/useDigitalCropZoom';
 import { useMockZoom, getVisualZoomScale } from './hooks/useMockZoom';
 import { useVideoRecording } from './hooks/useVideoRecording';
 import { uploadRecording } from './utils/uploadRecording';
+import { uploadCapture } from './utils/uploadCapture';
 import { StepBadge } from './components/StepBadge';
 import { StatusBar } from './components/StatusBar';
 import { ZoomControls, ZoomNotSupported } from './components/ZoomControls';
@@ -142,6 +143,7 @@ export default function App() {
   const [takePhotoBlob, setTakePhotoBlob] = useState<Blob | null>(null);
   const [frameGrabUrl, setFrameGrabUrl] = useState<string | null>(null);
   const [frameGrabStats, setFrameGrabStats] = useState<CaptureStats | null>(null);
+  const [frameGrabBlob, setFrameGrabBlob] = useState<Blob | null>(null);
 
   // Mock zoom mode
   const { mockProfile, mockCapabilities, isMockMode } = useMockZoom();
@@ -295,6 +297,7 @@ export default function App() {
         if (frameGrabUrl) URL.revokeObjectURL(frameGrabUrl);
         const newFrameUrl = URL.createObjectURL(grabBlob);
         setFrameGrabUrl(newFrameUrl);
+        setFrameGrabBlob(grabBlob);
 
         const grabStats: CaptureStats = {
           resolution: `${width} x ${height}`,
@@ -304,12 +307,22 @@ export default function App() {
         };
         setFrameGrabStats(grabStats);
 
-        setJsonData((prev) => ({
-          ...prev,
+        const newJsonData = {
+          ...jsonData,
           takePhotoCapture: stats,
           frameGrabCapture: grabStats,
           digitalCropZoom: undefined, // Clear stale crop data
-        }));
+        };
+        setJsonData(newJsonData);
+
+        // Upload captures to Google Drive (fire-and-forget)
+        uploadCapture({
+          takePhotoBlob: blob,
+          frameGrabBlob: grabBlob,
+          cropZoomUrl: !hasHardwareZoom && croppedImageUrl ? croppedImageUrl : null,
+          jsonData: newJsonData,
+          cameraLabel: jsonData.cameraInfo?.label || 'unknown',
+        });
       }
 
       const totalTime = performance.now() - startTime;
@@ -317,7 +330,7 @@ export default function App() {
     } catch (error) {
       setStatus({ message: `Capture error: ${(error as Error).message}`, type: 'error' });
     }
-  }, [takePhoto, zoomCapabilities, takePhotoUrl, frameGrabUrl, isMockMode, zoomValue]);
+  }, [takePhoto, zoomCapabilities, takePhotoUrl, frameGrabUrl, isMockMode, zoomValue, hasHardwareZoom, croppedImageUrl, jsonData]);
 
   const handleClear = useCallback(() => {
     if (takePhotoUrl) URL.revokeObjectURL(takePhotoUrl);
@@ -327,6 +340,7 @@ export default function App() {
     setTakePhotoBlob(null);
     setFrameGrabUrl(null);
     setFrameGrabStats(null);
+    setFrameGrabBlob(null);
 
     setJsonData((prev) => ({
       cameraInfo: prev.cameraInfo,
