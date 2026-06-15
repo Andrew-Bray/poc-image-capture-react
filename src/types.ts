@@ -63,7 +63,13 @@ export interface ZoomCapabilities {
   step: number;
 }
 
+export interface AxisCaps {
+  min: number;
+  max: number;
+  step: number;
+}
+
 export interface PanTiltCapabilities {
-  pan: { min: number; max: number; step: number } | null;
-  tilt: { min: number; max: number; step: number } | null;
+  pan: AxisCaps | null;
+  tilt: AxisCaps | null;
 }

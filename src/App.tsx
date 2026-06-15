@@ -9,6 +9,7 @@ import { useMockZoom, getVisualZoomScale, getVisualPanOffset, getVisualTiltOffse
 import { usePanTiltControl } from './hooks/usePanTiltControl';
 import { useVideoRecording } from './hooks/useVideoRecording';
 import { useMockZoomStream } from './hooks/useMockZoomStream';
+import { useGesturePTZ } from './hooks/useGesturePTZ';
 import { uploadRecording } from './utils/uploadRecording';
 import { uploadCapture } from './utils/uploadCapture';
 import { getDeviceInfo } from './utils/getDeviceInfo';
@@ -67,6 +68,48 @@ const videoContainer = css`
   border-radius: 8px;
   max-width: 640px;
   max-height: 480px;
+  touch-action: none; /* Disable browser gestures for custom handling */
+  user-select: none;
+`;
+
+const videoContainerGestureReady = css`
+  cursor: grab;
+  border: 2px solid transparent;
+  transition: border-color 0.15s ease-out;
+
+  &:hover {
+    border-color: ${colors.blue[300]};
+  }
+`;
+
+const videoContainerGesturing = css`
+  cursor: grabbing;
+  border-color: ${colors.blue[500]};
+`;
+
+const gestureHint = css`
+  font-size: 12px;
+  color: ${colors.gray[500]};
+  margin-top: 6px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 2px 5px;
+    font-size: 11px;
+    font-family: inherit;
+    background: ${colors.gray[200]};
+    border-radius: 3px;
+    border: 1px solid ${colors.gray[300]};
+  }
 `;
 
 const videoStyle = css`
@@ -333,6 +376,19 @@ export default function App() {
     [applyZoom]
   );
 
+  // Gesture-based PTZ controls
+  const { bind: gestureBind, isGesturing } = useGesturePTZ({
+    zoomCapabilities,
+    panCapabilities: panTiltCapabilities?.pan ?? null,
+    tiltCapabilities: panTiltCapabilities?.tilt ?? null,
+    zoomValue,
+    panValue,
+    tiltValue,
+    onZoomChange: handleZoomChange,
+    onPanChange: applyPan,
+    onTiltChange: applyTilt,
+  });
+
   const handleCapture = useCallback(async () => {
     if (!webcamRef.current) return;
 
@@ -475,7 +531,14 @@ export default function App() {
               Start Camera
             </h2>
 
-            <div css={videoContainer}>
+            <div
+              css={[
+                videoContainer,
+                (hasHardwareZoom || hasHardwarePanTilt) && videoContainerGestureReady,
+                isGesturing && videoContainerGesturing,
+              ]}
+              {...((hasHardwareZoom || hasHardwarePanTilt) ? gestureBind() : {})}
+            >
               {isMockMode && <div css={mockBadge}>Mock: {mockProfile}</div>}
               {showZoomPrompt && (
                 <div css={zoomPromptBanner}>
@@ -494,6 +557,14 @@ export default function App() {
                 forceScreenshotSourceSize={true}
               />
             </div>
+
+            {(hasHardwareZoom || hasHardwarePanTilt) && (
+              <div css={gestureHint}>
+                <span>Drag to pan/tilt</span>
+                <span><kbd>Ctrl</kbd>+scroll to zoom</span>
+                <span>Double-click to center</span>
+              </div>
+            )}
 
             <div css={buttonRow}>
               <button css={buttonPrimary} disabled={isRunning}>
