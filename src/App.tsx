@@ -363,6 +363,7 @@ export default function App() {
   const handleUserMediaError = useCallback((error: string | DOMException) => {
     const message = typeof error === 'string' ? error : error.message;
     setStatus({ message: `Camera error: ${message}`, type: 'error' });
+    console.error(message);
   }, []);
 
   const handleZoomChange = useCallback(

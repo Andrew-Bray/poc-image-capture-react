@@ -74,6 +74,21 @@ async function centerCropToAspectRatio(
   return { blob: croppedBlob, width: cropWidth, height: cropHeight };
 }
 
+// Detect iOS/iPadOS (Safari or Chrome on iOS uses WebKit)
+// Lazy evaluation to avoid issues with module load timing
+let _isIOSWebKit: boolean | null = null;
+function isIOSWebKit(): boolean {
+  if (_isIOSWebKit === null) {
+    try {
+      _isIOSWebKit = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+    } catch {
+      _isIOSWebKit = false;
+    }
+  }
+  return _isIOSWebKit;
+}
+
 export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageCaptureReturn {
   const { mockZoomCapabilities, mockPanTiltCapabilities } = options;
   const [imageCapture, setImageCapture] = useState<ImageCapture | null>(null);
@@ -199,7 +214,43 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
       }
 
       const startTime = performance.now();
-      let blob = await imageCapture.takePhoto();
+
+      // iOS WebKit has intermittent AVCapturePhotoOutput failures.
+      // Retry with delays to handle transient camera state issues.
+      const maxRetries = isIOSWebKit() ? 3 : 1;
+      let blob: Blob | null = null;
+      let lastError: Error | null = null;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // On iOS retries, wait for camera to stabilize
+          if (attempt > 1) {
+            console.log(`[takePhoto] iOS retry attempt ${attempt}/${maxRetries}`);
+            await new Promise((r) => setTimeout(r, 200 * attempt));
+          }
+
+          // Check track is still live before attempting capture
+          if (trackRef.current.readyState !== 'live') {
+            throw new Error(`Track not live (state: ${trackRef.current.readyState})`);
+          }
+
+          blob = await imageCapture.takePhoto();
+          break; // Success, exit retry loop
+        } catch (err) {
+          lastError = err as Error;
+          console.warn(`[takePhoto] Attempt ${attempt} failed:`, lastError.message);
+
+          // If not iOS or last attempt, don't retry
+          if (!isIOSWebKit() || attempt === maxRetries) {
+            throw lastError;
+          }
+        }
+      }
+
+      if (!blob) {
+        throw lastError || new Error('takePhoto failed');
+      }
+
       const captureTime = performance.now() - startTime;
 
       // Get dimensions by loading the image
