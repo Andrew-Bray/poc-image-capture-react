@@ -13,7 +13,6 @@ export function useDigitalCropZoom(): UseDigitalCropZoomReturn {
   const [cropFactor, setCropFactor] = useState(1);
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Create canvas once
   useEffect(() => {

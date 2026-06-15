@@ -211,7 +211,6 @@ export default function App() {
   const [takePhotoBlob, setTakePhotoBlob] = useState<Blob | null>(null);
   const [frameGrabUrl, setFrameGrabUrl] = useState<string | null>(null);
   const [frameGrabStats, setFrameGrabStats] = useState<CaptureStats | null>(null);
-  const [frameGrabBlob, setFrameGrabBlob] = useState<Blob | null>(null);
 
   // Zoom prompt banner
   const [showZoomPrompt, setShowZoomPrompt] = useState(false);
@@ -309,7 +308,7 @@ export default function App() {
         // Determine camera label
         const cameraLabel = isMockMode
           ? `Mock ${mockProfile === 'brio' ? 'BRIO' : 'Standard'}`
-          : settings.label || 'Unknown Camera';
+          : track.label || 'Unknown Camera';
 
         // Get all available video input devices
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -431,7 +430,6 @@ export default function App() {
         if (frameGrabUrl) URL.revokeObjectURL(frameGrabUrl);
         const newFrameUrl = URL.createObjectURL(grabBlob);
         setFrameGrabUrl(newFrameUrl);
-        setFrameGrabBlob(grabBlob);
 
         const grabStats: CaptureStats = {
           resolution: `${width} x ${height}`,
@@ -474,7 +472,6 @@ export default function App() {
     setTakePhotoBlob(null);
     setFrameGrabUrl(null);
     setFrameGrabStats(null);
-    setFrameGrabBlob(null);
 
     setJsonData((prev) => ({
       cameraInfo: prev.cameraInfo,
@@ -562,8 +559,9 @@ export default function App() {
             {(hasHardwareZoom || hasHardwarePanTilt) && (
               <div css={gestureHint}>
                 <span>Drag to pan/tilt</span>
+                <span>Pinch to zoom</span>
                 <span><kbd>Ctrl</kbd>+scroll to zoom</span>
-                <span>Double-click to center</span>
+                <span>Double-tap to center</span>
               </div>
             )}
 

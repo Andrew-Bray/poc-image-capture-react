@@ -49,7 +49,7 @@ export function useZoomControl(
 
       try {
         // Must use advanced constraint syntax - flat { zoom: val } is silently ignored
-        await trackRef.current.applyConstraints({ advanced: [{ zoom: value }] });
+        await trackRef.current.applyConstraints({ advanced: [{ zoom: value } as MediaTrackConstraintSet] });
         setZoomValue(value);
       } catch (error) {
         console.error('Error applying zoom:', error);

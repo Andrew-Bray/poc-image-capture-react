@@ -54,8 +54,8 @@ export function useMockZoom(): {
     }
 
     // ?mockZoom with no value defaults to 'brio'
-    const profile: MockZoomProfile =
-      mockParam === '' || mockParam === 'true' ? 'brio' : (mockParam as MockZoomProfile);
+    const profile: Exclude<MockZoomProfile, null> =
+      mockParam === '' || mockParam === 'true' ? 'brio' : (mockParam as Exclude<MockZoomProfile, null>);
 
     if (!(profile in PTZ_PROFILES)) {
       console.warn(`Unknown mockZoom profile: "${mockParam}". Using 'brio'.`);

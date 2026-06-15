@@ -28,59 +28,22 @@ const title = css`
 
 const controlLayout = css`
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
-`;
-
-const tiltContainer = css`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-`;
-
-const tiltSliderWrapper = css`
-  position: relative;
-  width: 40px;
-  height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const tiltSlider = css`
-  width: 150px;
-  height: 8px;
-  transform: rotate(-90deg);
-  transform-origin: center center;
-`;
-
-const tiltLabel = css`
-  font-size: 12px;
-  color: ${colors.gray[500]};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const panContainer = css`
-  flex: 1;
-  display: flex;
   flex-direction: column;
   gap: 8px;
 `;
 
-const panRow = css`
+const sliderRow = css`
   display: flex;
   align-items: center;
   gap: 12px;
 `;
 
-const panSlider = css`
+const slider = css`
   flex: 1;
   height: 8px;
 `;
 
-const panLabel = css`
+const sliderLabel = css`
   font-size: 12px;
   color: ${colors.gray[500]};
   text-transform: uppercase;
@@ -118,41 +81,34 @@ export function PanTiltControls({
     <div css={controlsBox}>
       <h3 css={title}>{titleText}</h3>
       <div css={controlLayout}>
-        {/* Vertical Tilt slider */}
-        {tiltCapabilities && (
-          <div css={tiltContainer}>
-            <span css={tiltLabel}>Tilt</span>
-            <div css={tiltSliderWrapper}>
-              <input
-                type="range"
-                css={tiltSlider}
-                min={tiltMin}
-                max={tiltMax}
-                step={tiltStep}
-                value={tilt}
-                onChange={(e) => onTiltChange(parseFloat(e.target.value))}
-              />
-            </div>
-            <span css={valueBox}>{tiltDisplay}</span>
+        {panCapabilities && (
+          <div css={sliderRow}>
+            <span css={sliderLabel}>Pan</span>
+            <input
+              type="range"
+              css={slider}
+              min={panMin}
+              max={panMax}
+              step={panStep}
+              value={pan}
+              onChange={(e) => onPanChange(parseFloat(e.target.value))}
+            />
+            <span css={valueBox}>{panDisplay}</span>
           </div>
         )}
-
-        {/* Horizontal Pan slider */}
-        {panCapabilities && (
-          <div css={panContainer}>
-            <div css={panRow}>
-              <span css={panLabel}>Pan</span>
-              <input
-                type="range"
-                css={panSlider}
-                min={panMin}
-                max={panMax}
-                step={panStep}
-                value={pan}
-                onChange={(e) => onPanChange(parseFloat(e.target.value))}
-              />
-              <span css={valueBox}>{panDisplay}</span>
-            </div>
+        {tiltCapabilities && (
+          <div css={sliderRow}>
+            <span css={sliderLabel}>Tilt</span>
+            <input
+              type="range"
+              css={slider}
+              min={tiltMin}
+              max={tiltMax}
+              step={tiltStep}
+              value={tilt}
+              onChange={(e) => onTiltChange(parseFloat(e.target.value))}
+            />
+            <span css={valueBox}>{tiltDisplay}</span>
           </div>
         )}
       </div>

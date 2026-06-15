@@ -129,7 +129,8 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
       console.log('[MockZoom] Injecting fake zoom capabilities:', mockZoomCapabilities);
     } else {
       // Real mode: detect actual hardware zoom
-      const zoomCap = capabilities.zoom;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const zoomCap = (capabilities as any).zoom;
       if (
         zoomCap &&
         typeof zoomCap === 'object' &&
@@ -146,7 +147,7 @@ export function useImageCapture(options: UseImageCaptureOptions = {}): UseImageC
 
         // Reset zoom to min on startup (zoom level persists across sessions in Chrome 112+)
         try {
-          await videoTrack.applyConstraints({ advanced: [{ zoom: zoomCap.min }] });
+          await videoTrack.applyConstraints({ advanced: [{ zoom: zoomCap.min } as MediaTrackConstraintSet] });
         } catch {
           // Ignore zoom reset errors
         }

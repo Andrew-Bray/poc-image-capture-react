@@ -144,7 +144,7 @@ export function useGesturePTZ(options: UseGesturePTZOptions): UseGesturePTZRetur
         dragStartRef.current = { pan: panValue, tilt: tiltValue };
         setIsGesturing(true);
       },
-      onDrag: ({ offset: [ox, oy], movement: [mx, my], first, memo }) => {
+      onDrag: ({ movement: [mx, my] }) => {
         // Use movement (delta from start) for pan/tilt
         const absMx = Math.abs(mx);
         const absMy = Math.abs(my);
@@ -167,7 +167,7 @@ export function useGesturePTZ(options: UseGesturePTZOptions): UseGesturePTZRetur
       onDragEnd: () => {
         setIsGesturing(false);
       },
-      onPinch: ({ offset: [scale], movement: [d], first, memo }) => {
+      onPinch: ({ offset: [scale], first, memo }) => {
         if (!zoomCapabilities) return;
 
         if (first) {
