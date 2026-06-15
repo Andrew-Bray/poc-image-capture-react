@@ -110,6 +110,21 @@ npm run build    # Production build
 npm run preview  # Preview production build
 ```
 
+## Future Roadmap
+
+### Touch-based PTZ Controls
+Allow users to control pan, tilt, and zoom via touch gestures on the video preview:
+- **Touch-and-drag** → pan and tilt
+- **Pinch** → zoom in/out
+
+Gestures map to screen capture canvas coordinates, translating to accurate hardware PTZ commands. Mock zoom simulation support is a nice-to-have for testing without hardware.
+
+### Tap-to-Track Object Following
+Tap or click on an object/face in the video preview to designate it as a tracking target. The system tracks the object's position frame-to-frame and automatically adjusts pan, tilt, and zoom to keep it centered.
+
+### Auto-Recognition and Auto-Follow
+Automatically detect items of interest (e.g., faces, products, QR codes) without user selection. The camera auto-follows the detected item, adjusting PTZ to keep it in frame as it moves.
+
 ## Related
 
 - **Vanilla JS version**: `../trove-spikes/poc-image-capture-zoom.html`
