@@ -204,6 +204,7 @@ export default function App() {
   const [zoomCapabilities, setZoomCapabilities] = useState<ZoomCapabilities | null>(null);
   const [panTiltCapabilities, setPanTiltCapabilities] = useState<PanTiltCapabilities | null>(null);
   const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
+  const [cameraEnabled, setCameraEnabled] = useState(true); // Controls Webcam mount/unmount
 
   // Capture results
   const [takePhotoUrl, setTakePhotoUrl] = useState<string | null>(null);
@@ -543,17 +544,23 @@ export default function App() {
                   Try sliding the zoom control to capture zoom and tilt behavior
                 </div>
               )}
-              <Webcam
-                ref={webcamRef}
-                audio={false}
-                css={[videoStyle, { transform: `translate(${visualPanOffset}%, ${visualTiltOffset}%) scale(${visualZoomScale})` }]}
-                videoConstraints={videoConstraints}
-                onUserMedia={handleUserMedia}
-                onUserMediaError={handleUserMediaError}
-                screenshotFormat="image/jpeg"
-                screenshotQuality={0.95}
-                forceScreenshotSourceSize={true}
-              />
+              {cameraEnabled ? (
+                <Webcam
+                  ref={webcamRef}
+                  audio={false}
+                  css={[videoStyle, { transform: `translate(${visualPanOffset}%, ${visualTiltOffset}%) scale(${visualZoomScale})` }]}
+                  videoConstraints={videoConstraints}
+                  onUserMedia={handleUserMedia}
+                  onUserMediaError={handleUserMediaError}
+                  screenshotFormat="image/jpeg"
+                  screenshotQuality={0.95}
+                  forceScreenshotSourceSize={true}
+                />
+              ) : (
+                <div css={[videoStyle, { display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.gray[500] }]}>
+                  Camera stopped
+                </div>
+              )}
             </div>
 
             {(hasHardwareZoom || hasHardwarePanTilt) && (
@@ -566,7 +573,13 @@ export default function App() {
             )}
 
             <div css={buttonRow}>
-              <button css={buttonPrimary} disabled={isRunning}>
+              <button
+                css={buttonPrimary}
+                disabled={isRunning}
+                onClick={() => {
+                  setCameraEnabled(true);
+                }}
+              >
                 Start Camera
               </button>
               <button
@@ -580,7 +593,10 @@ export default function App() {
                   cleanupImageCapture();
                   setIsRunning(false);
                   setZoomCapabilities(null);
+                  setPanTiltCapabilities(null);
+                  setStreamRef(null);
                   setJsonData({});
+                  setCameraEnabled(false); // Unmount Webcam to allow fresh start
                   setStatus({ message: 'Camera stopped', type: 'info' });
                 }}
               >
