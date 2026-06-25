@@ -186,11 +186,23 @@ const captureDescription = css`
   margin-top: 0;
 `;
 
-const videoConstraints: MediaTrackConstraints = {
+type PtzVideoConstraints = MediaTrackConstraints & {
+  pan?: boolean;
+  tilt?: boolean;
+  zoom?: boolean;
+};
+
+const videoConstraints: PtzVideoConstraints = {
   width: { ideal: 4096 },
   height: { ideal: 2160 },
-  aspectRatio: { min: 1.0, ideal: 1.7777777778 }
+  aspectRatio: { min: 1.0, ideal: 1.7777777778 },
   // facingMode: 'environment',
+  // Request PTZ so Chrome exposes (and permits) zoom/pan/tilt capabilities.
+  // Without this, getCapabilities() hides them and hardware zoom is never
+  // detected (we fall back to simulated). Harmless on cameras without PTZ.
+  pan: true,
+  tilt: true,
+  zoom: true,
 };
 
 export default function App() {
