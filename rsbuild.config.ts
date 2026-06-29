@@ -11,4 +11,9 @@ export default defineConfig({
   html: {
     title: 'Image Capture & Zoom PoC - React',
   },
+  output: {
+    sourceMap: {
+      js: 'source-map',
+    }
+  }
 });
